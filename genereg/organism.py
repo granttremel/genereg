@@ -142,7 +142,7 @@ class Organism:
     
     def show_genome(self):
         
-        hdrs = ["Gene", "Expression","# Downstream", "# Upstream", "Product", "Scale", "Threshold", "Decay"]
+        hdrs = ["Gene", "Expression", "wijaj", "# Downstream", "# Upstream", "Product", "Scale", "Threshold", "Decay"]
         rows = []
         
         num_upstream = self.genome.count_upstream()
@@ -152,14 +152,14 @@ class Organism:
         for gi in range(self.genome.num_genes):
             g = self.genome.genes[gi]
             
-            row = [g.name, format(self.genome.expression[g.name], "0.3f")]
+            row = [g.name, format(self.genome.expression[g.name], "0.3f"), format(g.wijaj, "0.3f")]
             row.extend([num_downstream[gi], num_upstream[gi]])
             row.extend(["--" for i in range(4)])
             rows.append(row)
             
             for nch in range(self.genome.ploidy):
                 a = self.genome.genotype[nch][g.name]
-                row = [a.id, "--", "--", "--", format(a.product,"0.3f"), format(a.scale,"0.3f"), format(a.threshold,"0.3f"), format(a.decay,"0.3f")]
+                row = [a.id, "--", "--", "--", "--", format(a.product,"0.3f"), format(a.scale,"0.3f"), format(a.threshold,"0.3f"), format(a.decay,"0.3f")]
                 rows.append(row)
         
         print(tabulate(rows, headers = hdrs, floatfmt = "0.3f"))
@@ -221,9 +221,7 @@ class Organism:
                 new_genome.add_gene(g, gam0[g.name], gam1[g.name], expression = expr)
             
             for (i, j), v in self.genome.get_interaction_dict().items():
-                gi = self.genome.genes[i]
-                gj = self.genome.genes[j]
-                new_genome.add_interaction(gj, gi, v)
+                new_genome.add_interaction(j, i, v)
             
             new_org = Organism(new_genome)
             offspring.append(new_org)
@@ -267,7 +265,7 @@ class Population:
         topk_orgs = orgranks[:topk]
         return [org for org, qt in topk_orgs], [qt for org, qt in topk_orgs]
     
-    def step_generation(self, surviving, mean_offspring, mutation_rate = 0.1, mutation_p = 0.2, mean_expression = 0.0, sd_expression = 0.0):
+    def step_generation(self, surviving:List[Organism], mean_offspring, mutation_rate = 0.1, mutation_p = 0.2, mean_expression = 0.0, sd_expression = 0.0):
         
         random.shuffle(surviving)
         

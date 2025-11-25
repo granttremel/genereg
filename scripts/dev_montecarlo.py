@@ -14,11 +14,11 @@ from genereg.network.genome import Genome
 from genereg import utils, organism
 from genereg.organism import Organism, Population
 
-def try_round(num_orgs, num_genes, num_interactions, num_phenotypes, num_timesteps, **kwargs):
+def try_round(num_orgs, num_genes, num_phenotypes, density, num_timesteps, **kwargs):
     mean_init_product = kwargs.pop("mean_init_product", 0.1)
     sd_init_product = kwargs.pop("sd_init_product", 0.0)
     
-    gnm = Genome.initialize_random(num_genes, num_phenotypes, num_interactions, **kwargs)
+    gnm = Genome.initialize_random(num_genes, num_phenotypes, density, **kwargs)
     orgs = []
     for no in range(num_orgs):
         
@@ -35,14 +35,14 @@ def try_round(num_orgs, num_genes, num_interactions, num_phenotypes, num_timeste
     
     orgs[0].show_genome()
     print(tabulate(orgs[0].genome.get_interactions()))
-    orgs[0].plot_product()
+    # orgs[0].plot_product()
     Organism.plot_expressions(*orgs)
     
     # print(orgs[0].history.get("product"))
     
     pass
 
-def try_monte_carlo(num_rounds, num_genes, num_interactions, num_phenotypes, num_timesteps, **kwargs):
+def try_monte_carlo(num_rounds, num_genes, num_phenotypes, density, num_timesteps, **kwargs):
     
     mean_init_product = kwargs.pop("mean_init_product", 0.1)
     sd_init_product = kwargs.pop("sd_init_product", 0.0)
@@ -59,7 +59,7 @@ def try_monte_carlo(num_rounds, num_genes, num_interactions, num_phenotypes, num
     # most_uniq = None
     
     for nr in range(num_rounds):
-        gnm = Genome.initialize_random(num_genes, num_phenotypes, num_interactions, **kwargs)
+        gnm = Genome.initialize_random(num_genes, num_phenotypes, density, **kwargs)
         
         org = Organism(gnm)
         org.initialize(
@@ -180,15 +180,16 @@ def main():
     # gnm = test_random(10, 50)
     # org = test_organism(gnm)
     
-    num_orgs = 5
+    num_orgs = 8
     pop_size = 100
     
     num_rounds = 100
     num_genes = 10
-    num_inters = (num_genes) * (num_genes - 1) // 2
+    density = 0.8
     num_phenotypes = 0
     
     num_modules = 2
+    num_bridges = 1
     sd_mod_frac = 0.1
     
     num_timesteps = 20
@@ -196,25 +197,46 @@ def main():
     mean_expression = 0.5
     sd_expression = 0.1
     
-    mean_scale = 0.5
+    mean_scale = 1.0
     sd_scale = 0.1
     
-    mean_threshold = 0.3
+    mean_threshold = 0.1
     sd_threshold = 0.1
     
     mean_decay = 0.05
     sd_decay = 0.01
     
-    mean_weight = 0.5
-    sd_weight = 3.0
+    mean_weight = 0.0
+    sd_weight = 1
     
-    mean_init_product = 1.0
-    sd_init_product = 0.2
+    mean_init_product = 0.0
+    sd_init_product = 0.0
+    
+    # while True:
+    #     try_monte_carlo(num_rounds, num_genes, num_inters, num_phenotypes, num_timesteps,
+    #                         mean_expression = mean_expression,
+    #                         sd_expression = sd_expression,
+    #                         mean_threshold = mean_threshold,
+    #                         sd_threshold = sd_threshold,
+    #                         mean_decay = mean_decay,
+    #                         sd_decay = sd_decay,
+    #                         mean_weight = mean_weight,
+    #                         sd_weight = sd_weight,
+                            
+    #                         num_modules = num_modules,
+    #                         sd_mod_frac = sd_mod_frac,
+                            
+    #                         mean_init_product = mean_init_product,
+    #                         sd_init_product = sd_init_product,
+    #                     )
+    #     input()
     
     while True:
-        try_monte_carlo(num_rounds, num_genes, num_inters, num_phenotypes, num_timesteps,
+        try_round(num_orgs, num_genes, num_phenotypes, density, num_timesteps,
                             mean_expression = mean_expression,
                             sd_expression = sd_expression,
+                            mean_scale = mean_scale,
+                            sd_scale = sd_scale,
                             mean_threshold = mean_threshold,
                             sd_threshold = sd_threshold,
                             mean_decay = mean_decay,
@@ -223,31 +245,13 @@ def main():
                             sd_weight = sd_weight,
                             
                             num_modules = num_modules,
+                            num_bridges = num_bridges,
                             sd_mod_frac = sd_mod_frac,
                             
                             mean_init_product = mean_init_product,
                             sd_init_product = sd_init_product,
                         )
         input()
-    
-    # try_round(num_orgs, num_genes, num_inters, num_phenotypes, num_timesteps,
-    #                     mean_expression = mean_expression,
-    #                     sd_expression = sd_expression,
-    #                     mean_scale = mean_scale,
-    #                     sd_scale = sd_scale,
-    #                     mean_threshold = mean_threshold,
-    #                     sd_threshold = sd_threshold,
-    #                     mean_decay = mean_decay,
-    #                     sd_decay = sd_decay,
-    #                     mean_weight = mean_weight,
-    #                     sd_weight = sd_weight,
-                        
-    #                     num_modules = num_modules,
-    #                     sd_mod_frac = sd_mod_frac,
-                        
-    #                     mean_init_product = mean_init_product,
-    #                     sd_init_product = sd_init_product,
-    #                 )
 
     # try_basic()
 

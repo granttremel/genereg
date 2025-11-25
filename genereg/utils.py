@@ -48,8 +48,8 @@ class Rectifier:
     def _tanh(self, value):
         return np.tanh(value)
     
-    def _sigmoid(self, value):
-        return 1/(1+np.exp(-value))
+    def _sigmoid(self, value, b = 0.5):
+        return 1/(1+np.exp(b - value))
     
     def _relu(self, value):
         return value if value > 0.0 else 0.0

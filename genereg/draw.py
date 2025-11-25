@@ -366,7 +366,8 @@ def scalar_to_text_nb(scalars, minval = None, maxval = None, fg_color = 53, bg_c
     rng = (maxval - minval)/1
     c = (minval+ maxval)/2
     if rng == 0:
-        return [fg+bg+eff + SCALE[-1] + RESET]
+        # return [fg+bg+eff + SCALE[-1] + RESET]
+        rng = 1
 
     
     for s in scalars:

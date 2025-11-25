@@ -80,10 +80,12 @@ class Genome:
     def set_allele(self, allele:Allele, nchr):
         self.genotype[nchr][allele.gene.name] = allele
     
-    def add_interaction(self, affected_gene:Gene, effector_gene:Gene, weight):
-        if not affected_gene.name in self.interactions:
-            self.interactions[affected_gene.name] = {}
-        self.interactions[affected_gene.name][effector_gene.name] = weight
+    def add_interaction(self, affected_gene_ind:int, effector_gene_ind:int, weight):
+        g_aff = self.genes[affected_gene_ind]
+        g_eff = self.genes[effector_gene_ind]
+        if not g_aff.name in self.interactions:
+            self.interactions[g_aff.name] = {}
+        self.interactions[g_aff.name][g_eff.name] = weight
     
     def get_expression(self):
         return np.array([self.expression[g.name] for g in self.genes])
@@ -205,7 +207,8 @@ class Genome:
             # Calculate the weighted sum of interactions once (same for all chromosomes)
             # sum w_ij * a_j, w is interaction, a is expression
             wijaj = np.sum([inter_ij*expr[gj] for gj, inter_ij in inters_i.items()])
-
+            gi.wijaj = wijaj
+            
             # Evaluate each chromosome's allele independently
             allele_products = []
             for chr in range(self.ploidy):
@@ -291,17 +294,14 @@ class Genome:
         inters = self.get_interaction_dict()
         
         for (ni, nj) in inters:
-            gi = new_gnm.genes[ni]
-            gj = new_gnm.genes[nj]
-            
             wgt = inters[(ni, nj)]
             
-            new_gnm.add_interaction(gi, gj, wgt)
+            new_gnm.add_interaction(ni, nj, wgt)
         
         return new_gnm
     
     @classmethod
-    def initialize_random(cls, num_genes, num_phenotypes, num_interactions, **params):
+    def initialize_random(cls, num_genes, num_phenotypes, density, **params):
         
         ploidy = params.get("ploidy", 2)
         
@@ -324,8 +324,8 @@ class Genome:
         sd_wgt = params.get("sd_weight", 1.0)
         
         num_modules = params.get("num_modules", 1)
+        num_bridges = params.get("num_bridges", 0)
         sd_mod_frac = params.get("sd_module_fraction", 0.1)
-        num_bridge = params.get("num_bridge", 0)
         
         gnm = cls(ploidy = ploidy)
         
@@ -346,40 +346,13 @@ class Genome:
             init_exp = random.normalvariate(mean_exp, sd_exp) 
             gnm.add_gene(gene, *alleles, expression = init_exp)
         
-        max_inters = num_genes * (num_genes - 1)
-        num_interactions = min(max_inters, num_interactions)
-        # inter_pairs = list(itertools.chain.from_iterable([[(i, j + int(j==1)%gnm.num_genes) for i in range(num_genes)] for j in range(num_genes)])) # doopid
-        inter_pairs = list(itertools.chain.from_iterable([[(i, j) for j in range(num_genes) if j!=i] for i in range(num_genes)]))
-        inters = random.sample(inter_pairs, num_interactions)
+        if num_modules > 1:
+            inter_dict = cls.sample_interactions_modular(num_genes, num_modules, num_bridges, density, sd_mod_frac, mean_wgt, sd_wgt)
+        else:
+            inter_dict = cls.sample_interactions(num_genes, density, mean_wgt, sd_wgt)
         
-        # inter_mods = []
-        # if num_modules > 1:
-            
-        #     mod_f = 1 / num_modules
-        #     mod_sizes = [num_genes*random.normalvariate(mod_f, sd_mod_frac) for n in range(num_modules)]
-        #     err = num_genes - int(sum(mod_sizes))
-        #     err_whole = err // num_modules
-        #     err_res = err % num_modules
-            
-        #     i_last = 0
-        #     for i in range(num_modules):
-                
-        #         i_mod = i_last + int(round(mod_sizes[i])) + err_whole
-        #         if err_res > 0:
-        #             i_mod +=1
-        #             err_res -=1
-                
-        #         i_last = i_mod
-        # else:
-        #     inter_mods = [inters]
-        
-        for (ni, nj) in inters:
-            gi = gnm.genes[ni]
-            gj = gnm.genes[nj]
-            
-            wgt = random.normalvariate(mean_wgt, sd_wgt)
-            
-            gnm.add_interaction(gi, gj, wgt)
+        for (ni, nj), wgt in inter_dict.items():
+            gnm.add_interaction(ni, nj, wgt)
 
         for pg in range(num_phenotypes):
             
@@ -397,6 +370,49 @@ class Genome:
                 
         return gnm
     
+    @classmethod
+    def sample_interactions(cls, num_genes, density, mean_weight, sd_weight):
+        
+        inter_pairs = list(itertools.chain.from_iterable([[(i, j) for j in range(num_genes) if j!=i] for i in range(num_genes)]))
+        inter_dict = {k:random.normalvariate(mean_weight, sd_weight) for k in inter_pairs if random.random() < density}
+        return inter_dict
+    
+    @classmethod
+    def sample_interactions_modular(cls, num_genes, num_modules, num_bridges, density, sd_mod_frac, mean_weight, sd_weight):
+        
+        gene_inds = list(range(num_genes))
+        random.shuffle(gene_inds)
+        
+        bridges = [gene_inds.pop(0) for n in range(num_bridges)]
+        
+        mean_mod_frac = 1 / num_modules
+        mod_fracs = [random.normalvariate(mean_mod_frac, sd_mod_frac) for n in range(num_modules)]
+        sum_fracs = sum(mod_fracs)
+        mod_lens = [int(mf * len(gene_inds) / sum_fracs) for mf in mod_fracs]
+        
+        inter_groups = [[gene_inds.pop(0) for n in range(ml)] for ml in mod_lens]
+        
+        inter_dict = {}
+        
+        for b in bridges:
+            for i in range(num_genes):
+                if i!=b:
+                    if random.random() < density:
+                        inter_dict[(b, i)] = random.normalvariate(mean_weight, sd_weight)
+                    if random.random() < density:
+                        inter_dict[(i, b)] = random.normalvariate(mean_weight, sd_weight)
+        
+        for ig in inter_groups:
+            inter_pairs = list(itertools.chain.from_iterable([[(i, j) for j in ig if j!=i] for i in ig]))
+            for k in inter_pairs:
+                if random.random() < density:
+                    inter_dict[k] = random.normalvariate(mean_weight, sd_weight)
+        
+        print(f"bridges: {bridges}")
+        print(f"modules: {inter_groups}")
+        
+        return inter_dict
+        
     def __repr__(self):
         
         parts = []

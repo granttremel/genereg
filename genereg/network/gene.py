@@ -16,6 +16,9 @@ class Gene:
         self.name = name
         self.alleles:Dict[str, 'Allele'] = {}
         
+        self.gene_product = 0
+        self.wijaj = 0
+        
         self._params = params
         self.rect:Rectifier = Rectifier(rect, **params)
         
@@ -29,7 +32,11 @@ class Gene:
     
     def evaluate(self, *allele_products):
         gene_product = self.epistasis(*allele_products)
-        return self.rectify(gene_product)
+        self.gene_product = self.rectify(gene_product)
+        return self.gene_product
+    
+    def calculate_cost(self, allele_product):
+        return self.cost_func(allele_product, self.cost_factor)
     
     def create_allele(self, allele_id, scale, threshold, decay):
         allele_id = f"Allele{len(self.alleles)}"
@@ -51,7 +58,8 @@ class Allele:
         self.gene = gene
         self.id = allele_id
         self.scale = np.clip(scale, 0.0, None)
-        self.threshold = np.clip(threshold, 0.0, None)
+        # self.threshold = np.clip(threshold, 0.0, None)
+        self.threshold = threshold
         self.decay = np.clip(decay, 0.0, 1.0)
         self.product = 0.0
         
@@ -62,13 +70,15 @@ class Allele:
     
     def evaluate(self, expression):
         """
-        conversion of gene expression quantity into measure of gene product. expression is added to baseline expression, i.e. mRNAs per time, then scaled to quantity of gene product (e.g. concentration of protein). Gene products degrade at a rate determined by decay, and residual is added. This is rectified in gene-dependent manner to maintain biological realism (some gene products cannot be negative, some have saturating behavior). 
+        conversion of gene expression quantity into measure of EFFECT of gene product. expression is added to baseline expression, i.e. mRNAs per time, then scaled to quantity of gene product (e.g. concentration of protein). Gene products degrade at a rate determined by decay, and residual is added. This is rectified in gene-dependent manner to maintain biological realism (some gene products cannot be negative, some have saturating behavior). 
         """
-        gene_product = self.scale * (expression-self.threshold) + self.decay * self.product
-        self.product = gene_product
-        # return self.gene.rectify(gene_product)
-        return gene_product
-        
+        product = self.scale * (expression-self.threshold) + self.decay * self.product
+        self.product = product
+        return product
+    
+    def calculate_cost(self):
+        return self.gene.calculate_cost(self.product)
+    
     def get_params(self):
         return np.array([self.scale, self.threshold, self.decay])
     
@@ -103,7 +113,21 @@ class Allele:
             mdecay = max(0, min(1, mdecay))  # Clamp between 0 and 1
 
         return Allele(self.gene, self.id, mscale, mthreshold, mdecay)
+
+class Interaction:
     
+    def __init__(self, gene, weight, bias):
+        
+        self.gene = gene
+        self.weight = weight
+        self.bias = bias
+        
+    def evaluate(self, expression):
+        return self.weight * expression + self.bias
+    
+    
+
+
 class PhenotypicGene(Gene):
     """
     this is a gene whose product has a direct effect on phenotype, mediated by no regulatory mechanisms. the cost is defined by thermodynamics or environment and is not subject to balancing. if the phenotype is fundamentally produced by interactions of genes (almost always true), then this gene is symbolic, not an element of the genome but representative of the process of integrating genes into phenotype
