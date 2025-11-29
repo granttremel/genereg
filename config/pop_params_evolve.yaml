@@ -1,0 +1,18 @@
+
+pop_size: 200
+num_timesteps: 20
+mean_offspring: 2.5
+
+rate_variability: 0.05
+p_variability: 0.3
+
+rate_mutation: 0.1
+p_mutation: 0.5
+
+epoch_size: 5
+num_epochs: 1
+topk_final: 5
+
+metric: "uniqueness"
+
+generator: "normal"

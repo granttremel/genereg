@@ -1,0 +1,29 @@
+
+upstream_density: 0.5
+downstream_density: 0.2
+
+mean_scale: 1.5
+sd_scale: 0.5
+mean_threshold: 0.2
+sd_threshold: 0.4
+mean_decay: 0.5
+sd_decay: 0.2
+
+n: 2
+kn: 0.5
+
+mean_weight: 0.0
+sd_weight: 1.5
+
+cost_type: "parabolic"
+mean_cost: 1.0
+sd_cost: 0.0
+
+mean_init_product: 0.5
+sd_init_product: 0.25
+
+mode: "alt" # random, alt
+rect: "Sigmoid"
+epistasis: "sum"
+
+generator: "normal"

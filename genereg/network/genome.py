@@ -2,6 +2,7 @@
 
 from typing import Dict, List, Tuple, Any, Union, Optional
 import random
+import string
 
 import itertools
 
@@ -11,7 +12,9 @@ import os
 from pathlib import Path
 import json
 
-from genereg.network.gene import Gene, Allele, PhenotypicGene, PhenotypicAllele
+from genereg import draw
+from genereg.network.gene import Gene, Allele, Phene, Phallele, Interaction
+from genereg.utils import Rectifier, Epistasis
 
 
 
@@ -23,23 +26,27 @@ class Genome:
     Two genes should interact regardless of alleles..
     """
     
-    def __init__(self, ploidy = 2):
+    def __init__(self, ploidy = 2, tag = ""):
         
         self.ploidy = ploidy
-        
-        self.genes:List[Gene] = []
+        self.tag = tag
+
+        self.genes:Dict[str, Gene] = {}
+        self.gene_order:List[str] = []  # Maintains insertion order for reliable indexing
         self.expression:Dict[str,float] = {}
-        
+
         self.genotype:List[Dict[str, Allele]]= [{} for n in range(ploidy)]
         self.phenotype:Dict[str, float]
-        
-        self.interactions:Dict[str, Dict[str, float]] = {}
-        
-        self._cache = {"expression":None, "product":None}
+
+        self.interactions:Dict[str, Dict[str, Interaction]] = {}
     
     @property
     def num_genes(self):
         return len(self.genes)
+    
+    @property
+    def num_phenes(self):
+        return sum(1 for pi in self.iter_phenes())
     
     @property
     def num_interactions(self):
@@ -49,195 +56,212 @@ class Genome:
         
         num_upstream = []
         
-        for gi, gjdict in self.interactions.items():
+        for gi in self.iter_genes():
+            gjdict = self.interactions.get(gi.name, {})
+            num_upstream.append(len(gjdict))
+            
+        for gi in self.iter_phenes():
+            gjdict = self.interactions.get(gi.name, {})
             num_upstream.append(len(gjdict))
         
         return num_upstream
     
     def count_downstream(self):
-        
-        num_downstream = {gj.name:0 for gj in self.genes}
-        
+
+        num_downstream = {gj_name:0 for gj_name in self.gene_order}
+
         for gi, gjdict in self.interactions.items():
             for gj, v in gjdict.items():
                 num_downstream[gj] += 1
-        
-        return [num_downstream[gj.name] for gj in self.genes]
+
+        return [num_downstream[gj_name] for gj_name in self.gene_order]
     
     def get_gene(self, gene_name, default = None):
-        for g in self.genes:
-            if g.name == gene_name:
-                return g
-        return default
+        return self.genes.get(gene_name, default)
     
-    def add_gene(self, gene:Gene, *alleles, expression = 0):
-        self.genes.append(gene)
-        self.expression[gene.name] = expression
+    def add_gene(self, gene:Gene, *alleles):
+        self.genes[gene.name] = gene
+        self.gene_order.append(gene.name)
+        self.expression[gene.name] = 0.0
         for i in range(self.ploidy):
             self.genotype[i][gene.name] = alleles[i]
-        self.interactions[gene.name] = {}
+        if gene.is_phenotype:
+            self.interactions[gene.name] = {}
+        else:
+            self.interactions[gene.name] = {}
             
     def set_allele(self, allele:Allele, nchr):
         self.genotype[nchr][allele.gene.name] = allele
     
-    def add_interaction(self, affected_gene_ind:int, effector_gene_ind:int, weight):
-        g_aff = self.genes[affected_gene_ind]
-        g_eff = self.genes[effector_gene_ind]
-        if not g_aff.name in self.interactions:
-            self.interactions[g_aff.name] = {}
-        self.interactions[g_aff.name][g_eff.name] = weight
+    def make_interaction(self, effector_gene_ind,  affected_gene_ind, weight):
+        g_aff = self.get_gene(affected_gene_ind)
+        g_eff = self.get_gene(effector_gene_ind)
+        inter = Interaction(g_eff, g_aff, weight = weight)
+        
+        self.add_interaction(inter)
+    
+    def add_interaction(self, new_inter:Interaction):
+        
+        if not isinstance(new_inter, Interaction):
+            raise ValueError(f"{new_inter} is not valid Interaction")
+        
+        gn_aff = new_inter.affected.name
+        gn_eff = new_inter.effector.name
+        
+        if not gn_aff in self.interactions:
+            self.interactions[gn_aff] = {}
+        
+        self.interactions[gn_aff][gn_eff] = new_inter
+        
+    def add_interactions(self, new_inters:Dict[Tuple[str,str], Interaction]):
+        
+        for (e, a), inter in new_inters.items():
+            self.add_interaction(inter)
     
     def get_expression(self):
-        return np.array([self.expression[g.name] for g in self.genes])
+        return np.array([self.expression[g.name] for g in self])
     
     def get_product(self):
-        return np.vstack([np.array([self.genotype[chr][g.name].product for g in self.genes]) for chr in range(self.ploidy)])
+        return np.vstack([np.array([self.genotype[chr][g_name].product for g_name in self.gene_order]) for chr in range(self.ploidy)])
     
     def get_interactions(self):
-        
+
         inters = np.zeros((self.num_genes, self.num_genes))
-        gene_names = [g.name for g in self.genes]
-        
+
         for g1, g0dict in self.interactions.items():
             for g0, v in g0dict.items():
-                g0ind = gene_names.index(g0)
-                g1ind = gene_names.index(g1)
-                inters[g0ind, g1ind] = v
-        
+                g0ind = self.gene_order.index(g0)
+                g1ind = self.gene_order.index(g1)
+                inters[g0ind, g1ind] = v.weight
+
         return inters
     
     def get_interaction_dict(self):
         inter_dict = {}
-        gene_names = [g.name for g in self.genes]
-        
+
         for g1, g0dict in self.interactions.items():
             for g0, v in g0dict.items():
-                g0ind = gene_names.index(g0)
-                g1ind = gene_names.index(g1)
-                inter_dict[(g0ind, g1ind)] = v
-        
+                g0ind = self.gene_order.index(g0)
+                g1ind = self.gene_order.index(g1)
+                inter_dict[(g0ind, g1ind)] = v.weight
+
         return inter_dict
     
     def get_state(self):
-        
-        state_vec = list()
-        theta_vec = list()
-        
-        for gene in self.genes:
-            state_vec.append(self.expression[gene.name])
-            
+
+        gene_states = {}
+        allele_states = {n:{} for n in range(self.ploidy)}
+        interaction_states = {}
+
+        for gene_name in self.gene_order:
+            gene = self.genes[gene_name]
+            gene_states[gene.name] = gene.get_state()
             for n in range(self.ploidy):
-                allele = self.genotype[n][gene.name]
-                state_vec.append(allele.product)
-                
-                allele_params = allele.get_params()
-                theta_vec.extend(allele_params)
-            
-            if gene.name in self.interactions:
-                effectors = self.interactions[gene.name]
-                for g in self.genes:
-                    weight = effectors.get(g.name)
-                    if weight is not None:
-                        theta_vec.append(weight)
-        
-        return np.array(state_vec), np.array(theta_vec)
-    
-    def set_state(self, state_vec, theta_vec):
-        
-        state_vec = list(state_vec)
-        theta_vec = list(theta_vec)
-        
-        for gene in self.genes:
-            self.expression[gene.name] = state_vec.pop(0)
-            
-            for n in range(self.ploidy):
-                allele = self.genotype[n][gene.name]
-                allele.product = state_vec.pop(0)
-                
-                allele.set_params([theta_vec.pop(0) for i in range(3)])
-            
-            if gene.name in self.interactions:
-                effectors = self.interactions[gene.name]
-                for g in self.genes:
-                    if g.name in effectors:
-                        self.interactions[gene.name][g.name] = theta_vec.pop(0)
-    
-    def get_state_dict(self):
-        
-        state_dict = {}
-        init_prod = self._cache["product"]
-        
-        for i,gene in enumerate(self.genes):
-            state_dict[gene.name] = {"expression":self.expression[gene.name], "alleles":[]}
-            for n in range(self.ploidy):
-                allele = self.genotype[n][gene.name]
-                state_dict[gene.name]["alleles"].append({
-                    "id":allele.id,
-                    "scale":allele.scale,
-                    "threshold":allele.threshold,
-                    "decay":allele.decay,
-                    "initial_product":init_prod[n][i],
-                })
-        
-        return state_dict
-    
-    def save_state(self, fname, **metadata):
-        
-        fpath = os.path.join("./data", fname)
-        
-        sd = self.get_state_dict()
-        
-        out_dict = {
-            "state":sd,
-            "meta":metadata
+                allele = self.genotype[n][gene_name]
+                allele_states[n][gene_name] = allele.get_state()
+
+            interaction_states[gene_name] = {}
+            for gj, inter in self.interactions.get(gene_name, {}).items():
+                interaction_states[gene_name][gj] = inter.get_state()
+
+        return {
+            "genes":gene_states,
+            "genotype":allele_states,
+            "interactions":interaction_states,
+            "gene_order":self.gene_order
         }
-        
-        with open(fpath, "w") as f:
-            json.dump(out_dict, f, indent = 3)
-        
     
-    def update_expression(self):
+    def set_state(self, state_dict):
 
-        expr = self.expression
+        genes = state_dict.get("genes",[])
+        genotype = state_dict.get("genotype",[])
+        interactions = state_dict.get("interactions",{})
+
+        for gn, gd in genes.items():
+            gene = self.get_gene(gn)
+            gene.set_state(gd)
+
+            for n in range(self.ploidy):
+                ad = genotype[n][gene.name]
+                allele = self.genotype[n][gene.name]
+                allele.set_state(ad)
+
+            for gid, interd in interactions.get(gene.name, {}).items():
+
+                if gid in self.interactions[gene.name]:
+                    inter = self.interactions[gene.name][gid]
+                    if hasattr(inter, 'set_state'):
+                        inter.set_state(interd)
+                else:
+                    g_eff = self.genes.get(gid)
+                    if g_eff and hasattr(Interaction, 'from_state'):
+                        new_inter = Interaction.from_state(interd, g_eff, gene)
+                        self.interactions[gene.name][gid] = new_inter
+                
+    def save_state(self, fname, **metadata):
+        state = self.get_state()
+        state["meta"] = metadata
+        fpath = os.path.join("./data", fname)
+        with open(fpath, "w+") as f:
+            json.dump(state, f, indent = 3)
+    
+    def update_expression(self, resource = -1):
+
         new_exprs = {}
-
-        for gi in self.genes:
+        
+        for gi in self:
+            
             inters_i = self.interactions[gi.name]
 
             # Calculate the weighted sum of interactions once (same for all chromosomes)
             # sum w_ij * a_j, w is interaction, a is expression
-            wijaj = np.sum([inter_ij*expr[gj] for gj, inter_ij in inters_i.items()])
-            gi.wijaj = wijaj
-            
+            regulation = np.sum([inter_ij.evaluate() for gj, inter_ij in inters_i.items()])
+            gi.regulation = regulation
+
             # Evaluate each chromosome's allele independently
             allele_products = []
             for chr in range(self.ploidy):
                 allele = self.genotype[chr][gi.name]
-                allele_product = allele.evaluate(wijaj)
+                allele_product = allele.evaluate(regulation)
                 allele_products.append(allele_product)
-
+            
             # Combine allele products using the gene's epistasis function
             new_exprs[gi.name] = gi.evaluate(*allele_products)
+        
+        if resource > 0:
+            sum_expr = sum(new_exprs.values())
+            if sum_expr > resource:
+                scale = resource / sum_expr
+                for g in self:
+                    g.scale_expression(scale)
+                    new_exprs[g.name] = g.gene_product
 
         self.expression = new_exprs
         return self.get_expression()
     
-    def initialize(self, init_product = None, mean_init_product = 0.2, sd_init_product = 0.02):
-
-        if init_product is None or not init_product:
-            init_product = [random.normalvariate(mean_init_product, sd_init_product) for i in range(self.num_genes * self.ploidy)]
+    def initialize(self, init_product = None, **kwargs):
         
-        for chr in self.genotype:
-            for gn, a in chr.items():
-                a.initialize(init_product.pop(0))
+        init_exprs = {}
         
-        self._cache["expression"] = self.expression
-        self._cache["product"] = self.get_product()
+        if init_product:
+            for chr in self.genotype:
+                for gn, a in chr.items():
+                    # a.initialize(init_product.pop(0))
+                    a.initialize(init_product())
+        
+        for gene in self:
+            aps = [self.genotype[n][gene.name].product for n in range(self.ploidy)]
+            try:
+                gp = gene.evaluate(*aps)
+            except:
+                print(aps, gene.name, gene.alleles)
+            init_exprs[gene.name] = gp
+        self.expression = init_exprs
     
     def silence_gene(self, nchr, gene_name):
         allele = self.genotype[nchr][gene_name]
         
-        if isinstance(allele, PhenotypicAllele):
+        if isinstance(allele, Phallele):
             # at least one should be active or the organism perishes
             pass
         
@@ -246,173 +270,130 @@ class Genome:
     def unsilence_gene(self, nchr, gene_name):        
         allele = self.genotype[nchr][gene_name]
         
-        if isinstance(allele, PhenotypicAllele):
+        if isinstance(allele, Phallele):
             # at least one should be active or the organism perishes
             pass
         
         allele.toggle_silence(is_silent = False)
     
     def get_gamete(self, mutation_rate = 0.1, mutation_p = 0.2):
-        
+
         gam = {}
-        
-        for g in self.genes:
+
+        for gene_name in self.gene_order:
             na = random.randint(0, self.ploidy - 1)
-            a = self.genotype[na][g.name]
-            gam[g.name] = a.mutate(rate = mutation_rate, p = mutation_p)
-        
+            a = self.genotype[na][gene_name]
+            new_allele = a.mutate(rate = mutation_rate, p = mutation_p)
+            
+            gam[gene_name] = new_allele
+
         return gam
     
-    def randomize_alleles(self, **params):
+    def print(self):
+        draw.show_genome(self)
+    
+    def show_interactions(self):
+        draw.show_interactions(self)
+    
+    def show_interaction_heatmap(self, **kwargs):
+        draw.show_interaction_heatmap(
+            self.get_interactions(), 
+            row_labels = self.gene_order,
+            **kwargs)
         
-        mean_scale = params.get("mean_scale", 1.0)
-        sd_scale = params.get("sd_scale", 0.0)
-        
-        mean_threshold = params.get("mean_threshold", 0.5)
-        sd_threshold = params.get("sd_threshold", 0.1)
-        
-        mean_decay = params.get("mean_decay", 0.05)
-        sd_decay = params.get("sd_decay", 0.01)
+    
+    def with_mutant_alleles(self, rate, p, **params):
         
         new_gnm = Genome(ploidy = self.ploidy)
-        
-        for gi in range(self.num_genes):
-            gene = self.genes[gi]
-            
+
+        for gene in self:
+
             alleles = []
-            
+
             for n in range(self.ploidy):
-                scale = random.normalvariate(mean_scale, sd_scale)
-                thr = random.normalvariate(mean_threshold, sd_threshold)
-                decay = random.normalvariate(mean_decay, sd_decay)
-                
-                allele = gene.create_allele(f"Allele{n}", scale, thr, decay)
-                alleles.append(allele)
-            
+
+                new_allele = self.genotype[n][gene.name].mutate(rate, p)
+                alleles.append(new_allele)
+
             new_gnm.add_gene(gene, *alleles)
-        
-        inters = self.get_interaction_dict()
-        
-        for (ni, nj) in inters:
-            wgt = inters[(ni, nj)]
-            
-            new_gnm.add_interaction(ni, nj, wgt)
+
+        for gn_aff in self.interactions:
+            for gn_eff, inter in self.interactions[gn_aff].items():
+                new_inter = inter.mutate(rate, p)
+                new_gnm.add_interaction(new_inter)
         
         return new_gnm
     
-    @classmethod
-    def initialize_random(cls, num_genes, num_phenotypes, density, **params):
-        
-        ploidy = params.get("ploidy", 2)
-        
-        mean_cost = params.get("mean_cost", 1.0)
-        sd_cost = params.get("sd_cost", 0.1)
-        
-        mean_exp = params.get("mean_expression", 0.5)
-        sd_exp = params.get("sd_expression", 0.1)
-        
-        mean_scale = params.get("mean_scale", 1.0)
-        sd_scale = params.get("sd_scale", 0.0)
-        
-        mean_threshold = params.get("mean_threshold", 0.5)
-        sd_threshold = params.get("sd_threshold", 0.1)
-        
-        mean_decay = params.get("mean_decay", 0.05)
-        sd_decay = params.get("sd_decay", 0.01)
-        
-        mean_wgt = params.get("mean_weight", 0.0)
-        sd_wgt = params.get("sd_weight", 1.0)
-        
-        num_modules = params.get("num_modules", 1)
-        num_bridges = params.get("num_bridges", 0)
-        sd_mod_frac = params.get("sd_module_fraction", 0.1)
-        
-        gnm = cls(ploidy = ploidy)
-        
-        for g in range(num_genes):
-            cost = random.normalvariate(mean_cost, sd_cost)
-            gene = Gene(f"Gene{g}", cost_factor = cost)
-            
-            alleles = []
-            
-            for n in range(ploidy):
-                scale = random.normalvariate(mean_scale, sd_scale)
-                thr = random.normalvariate(mean_threshold, sd_threshold)
-                decay = random.normalvariate(mean_decay, sd_decay)
-                
-                allele = gene.create_allele(f"Allele{n}", scale, thr, decay)
-                alleles.append(allele)
-                
-            init_exp = random.normalvariate(mean_exp, sd_exp) 
-            gnm.add_gene(gene, *alleles, expression = init_exp)
-        
-        if num_modules > 1:
-            inter_dict = cls.sample_interactions_modular(num_genes, num_modules, num_bridges, density, sd_mod_frac, mean_wgt, sd_wgt)
-        else:
-            inter_dict = cls.sample_interactions(num_genes, density, mean_wgt, sd_wgt)
-        
-        for (ni, nj), wgt in inter_dict.items():
-            gnm.add_interaction(ni, nj, wgt)
+    # def randomize_alleles(self, **params):
 
-        for pg in range(num_phenotypes):
-            
-            cost = random.normalvariate(mean_cost, sd_cost)
-            gene = PhenotypicGene(f"PhenotypicGene{g}", cost_factor = cost, min_value = 0.0, max_value = 1.0)
-            
-            for n in range(ploidy):
-                
-                scale = random.normalvariate(mean_scale, sd_scale)
-                thr = random.normalvariate(mean_threshold, sd_threshold)
-                decay = random.normalvariate(mean_decay, sd_decay)
-                
-                allele = gene.create_allele(f"PhenotypicAllele{n}", scale, thr, decay)
-                alleles.append(allele)
-                
-        return gnm
+    #     mean_scale = params.get("mean_scale", 1.0)
+    #     sd_scale = params.get("sd_scale", 0.0)
+
+    #     mean_threshold = params.get("mean_threshold", 0.5)
+    #     sd_threshold = params.get("sd_threshold", 0.1)
+
+    #     mean_decay = params.get("mean_decay", 0.05)
+    #     sd_decay = params.get("sd_decay", 0.01)
+
+    #     new_gnm = Genome(ploidy = self.ploidy)
+
+    #     for gene in self:
+
+    #         alleles = []
+
+    #         for n in range(self.ploidy):
+    #             scale = random.normalvariate(mean_scale, sd_scale)
+    #             thr = random.normalvariate(mean_threshold, sd_threshold)
+    #             decay = random.normalvariate(mean_decay, sd_decay)
+
+    #             allele = gene.create_allele(f"Allele{n}", scale, thr, decay)
+    #             alleles.append(allele)
+
+    #         new_gnm.add_gene(gene, *alleles)
+
+    #     inters = self.get_interaction_dict()
+
+    #     for (ni, nj) in inters:
+    #         wgt = inters[(ni, nj)]
+
+    #         new_gnm.make_interaction(ni, nj, wgt)
+
+    #     return new_gnm
+        
+    def get_gene(self, ind):
+        gene = None
+        if isinstance(ind, int):
+            gn = self.gene_order[ind]
+            gene = self.genes.get(gn)
+        elif isinstance(ind, str):
+            gene = self.genes.get(ind)
+        
+        if gene is None:
+            raise ValueError(f"Index {ind} not valid")
+        
+        return gene
     
-    @classmethod
-    def sample_interactions(cls, num_genes, density, mean_weight, sd_weight):
-        
-        inter_pairs = list(itertools.chain.from_iterable([[(i, j) for j in range(num_genes) if j!=i] for i in range(num_genes)]))
-        inter_dict = {k:random.normalvariate(mean_weight, sd_weight) for k in inter_pairs if random.random() < density}
-        return inter_dict
+    def __getitem__(self, ind):
+        return self.get_gene(ind)
     
-    @classmethod
-    def sample_interactions_modular(cls, num_genes, num_modules, num_bridges, density, sd_mod_frac, mean_weight, sd_weight):
-        
-        gene_inds = list(range(num_genes))
-        random.shuffle(gene_inds)
-        
-        bridges = [gene_inds.pop(0) for n in range(num_bridges)]
-        
-        mean_mod_frac = 1 / num_modules
-        mod_fracs = [random.normalvariate(mean_mod_frac, sd_mod_frac) for n in range(num_modules)]
-        sum_fracs = sum(mod_fracs)
-        mod_lens = [int(mf * len(gene_inds) / sum_fracs) for mf in mod_fracs]
-        
-        inter_groups = [[gene_inds.pop(0) for n in range(ml)] for ml in mod_lens]
-        
-        inter_dict = {}
-        
-        for b in bridges:
-            for i in range(num_genes):
-                if i!=b:
-                    if random.random() < density:
-                        inter_dict[(b, i)] = random.normalvariate(mean_weight, sd_weight)
-                    if random.random() < density:
-                        inter_dict[(i, b)] = random.normalvariate(mean_weight, sd_weight)
-        
-        for ig in inter_groups:
-            inter_pairs = list(itertools.chain.from_iterable([[(i, j) for j in ig if j!=i] for i in ig]))
-            for k in inter_pairs:
-                if random.random() < density:
-                    inter_dict[k] = random.normalvariate(mean_weight, sd_weight)
-        
-        print(f"bridges: {bridges}")
-        print(f"modules: {inter_groups}")
-        
-        return inter_dict
-        
+    def iter_genes(self):
+        for gn in self.gene_order:
+            g = self.genes[gn]
+            if g.is_genotype:
+                yield g
+                
+    def iter_phenes(self):
+        for gn in self.gene_order:
+            g = self.genes[gn]
+            if g.is_phenotype:
+                yield g
+
+    def iter_bridges(self):
+        for gn in self.order:
+            g = self.get_gene(gn)
+            if g.is_bridge:
+                yield g
+
     def __repr__(self):
         
         parts = []
@@ -428,9 +409,90 @@ class Genome:
         parts.append(f"{self.num_genes} genes")
         parts.append(f"{self.num_interactions} interactions")
         
-        
         return f"{type(self).__name__}({", ".join(parts)})"
 
 
-
+class CompiledGenome:
+    
+    def __init__(self, ploidy, num_genes, **kwargs):
+    
+        self.ploidy = ploidy
+        self.num_genes = num_genes
+    
+        self.allele_scale = np.zeros((num_genes, ploidy))
+        self.allele_threshold = np.zeros((num_genes, ploidy))
+        self.allele_decay = np.zeros((num_genes, ploidy))
+        
+        rect_type = kwargs.get("rect","Sigmoid")
+        self.gene_rect = Rectifier(rect_type)
+        epi_type = kwargs.get("epistasis","sum")
+        self.gene_epistasis = Epistasis(epi_type)
+        
+        self.interactions = np.zeros((num_genes, num_genes))
+        
+        self.reg_state = np.zeros((num_genes))
+        self.allele_state = np.zeros((num_genes, ploidy))
+        self.gene_state = np.zeros((num_genes))
+    
+    def initialize(self, mean_init_prod, sd_init_prod):
+        self.allele_state = np.random.normal(mean_init_prod, sd_init_prod, size = (self.num_genes, self.ploidy))
+    
+    def update(self):
+        rg, ast, exp = self.calculate_gene_state(self.gene_state, self.allele_state)
+        self.reg_state = rg
+        self.allele_state = ast
+        self.gene_state = exp
+        return rg, ast, exp
+        
+    def calculate_gene_state(self, expression, allele_state):
+        
+        regulation = np.matvec(self.interactions, expression)
+        val = np.subtract(regulation, self.allele_threshold, axis = 0)
+        val = np.multiply(val, self.allele_scale, axis = 0) 
+        new_allele_state = val + np.multiply(allele_state, self.allele_decay, axis = 0)
+        
+        new_expression = self.gene_epistasis.func(new_allele_state, axis = 1)
+        
+        return regulation, new_allele_state, new_expression
+        
+    @classmethod
+    def from_genome(cls, gnm:Genome):
+        
+        ploidy = gnm.ploidy
+        num_genes = len(gnm)
+        
+        allele_scale = np.zeros((num_genes, ploidy))
+        allele_threshold = np.zeros((num_genes, ploidy))
+        allele_decay = np.zeros((num_genes, ploidy))
+        
+        gene_rect = gnm[0].rect
+        gene_epistasis = gnm[0].epistasis
+        
+        interactions = np.zeros((num_genes, num_genes))
+        
+        for i,gene in enumerate(gnm):
+            for n in range(gnm.ploidy):
+                
+                allele = gnm.genotype[n][gene.name]
+                allele_scale[i,n] = allele.scale
+                allele_threshold[i,n] = allele.threshold
+                allele_decay[i,n] = allele.decay
+                
+            for gj, inter in gnm.interactions.get(gene.name,{}).items():
+                j = gnm.gene_order.index(gj)
+                interactions[gj, i] = inter.weight
+        
+        return cls(ploidy, num_genes,
+                allele_scale = allele_scale,
+                allele_threshold = allele_threshold,
+                allele_decay = allele_decay,
+                rect = gene_rect,
+                epistasis = gene_epistasis,
+            )
+        
+        
+        
+        
+    
+    
 

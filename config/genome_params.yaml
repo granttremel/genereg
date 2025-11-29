@@ -1,0 +1,8 @@
+
+ploidy: 2
+num_genes: 10
+num_phenotypes: 2
+num_bridges: 2
+resource: 5
+
+generator: "normal"

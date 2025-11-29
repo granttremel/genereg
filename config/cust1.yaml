@@ -1,0 +1,17 @@
+
+gene_params:
+  mean_scale: 1.0
+
+phene_params:
+  mean_threshold: 0.4
+
+bridge_params:
+  upstream_density: 0.1
+  downstream_density: 0.1
+  mean_weight: 0.9
+  
+genome_params:
+  num_genes: 11
+
+pop_params:
+  pop_size: 201

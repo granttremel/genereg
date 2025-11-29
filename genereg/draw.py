@@ -4,11 +4,7 @@ import math
 import random
 import numpy as np
 
-# import matplotlib.pyplot as plt
-# import matplotlib.patches as patches
-
-# from ggene.seqs.bio import reverse_complement, complement
-# from ggene.seqs.find import find_subsequence, find_subsequences
+from tabulate import tabulate
 
 SCALE = " ▁▂▃▄▅▆▇█"
 
@@ -26,107 +22,12 @@ OTHER={
     "misc":"▖▗▘▙▚▛▜▝▞▟◐◑◒◓◔◕"
 }
 
-BOX = " ╵╶└╷│┌├╴┘─┴┐┤┬┼"
-_box = "⊢⊣⊤⊥"
-
 marker = "╵"
 
 leftright = "▗▖"
-# leftright = "⌋⌊"
-# leftright = "⌋⌊"
-# leftright = "⌟⌞"
-# leftright = ".."
-# leftright = "❳❲"
-# leftright = "◿◺"
-# leftright = "◢◣"
-# leftright= "◅▻"
-# leftright= "◁▷"
-# leftright = "⎦⎣"
-
-arrows = {
-        "default":[
-            (0X21BD, '↽'), #          ↽-----          -----↽
-            (0X21C0, '⇀'), #          ⇀-----          -----⇀
-        ],
-    
-        "extra":[     
-            (0X27F5, '⟵'), #          ⟵-----          -----⟵
-            (0X27F6, '⟶'), #          ⟶-----          -----⟶
-            (0X21FD, '⇽'), #          ⇽-----          -----⇽
-            (0X21FE, '⇾'), #          ⇾-----          -----⇾
-            (0X21E6, '⇦'), #          ⇦-----          -----⇦
-            (0X21E8, '⇨'), #          ⇨-----          -----⇨
-            (0X21E0, '⇠'), #          ⇠-----          -----⇠
-            (0X21E2, '⇢'), #          ⇢-----          -----⇢
-            (0X21D0, '⇐'), #          ⇐-----          -----⇐
-            (0X21D2, '⇒'), #          ⇒-----          -----⇒
-            (0X21C0, '⇀'), #          ⇀-----          -----⇀
-            (0X21C1, '⇁'), #          ⇁-----          -----⇁
-            (0X21C0, '⇀'), #          ⇀-----          -----⇀
-            (0X21BD, '↽'), #          ↽-----          -----↽
-            (0X21BC, '↼'), #          ↼-----          -----↼
-            (0X2190, '←'), #          ←-----          -----←
-            (0X2192, '→'), #          →-----          -----→
-               
-               
-            
-            (0X293A, '⤺'), #          ⤺-----          -----⤺
-            (0X293A, '⤺'), #          ⤺-----          -----⤺
-            (0X293B, '⤻'), #          ⤻-----          -----⤻
-            (0X293C, '⤼'), #          ⤼-----          -----⤼
-            (0X293D, '⤽'), #          ⤽-----          -----⤽
-            (0X21B6, '↶'), #          ↶-----          -----↶
-            (0X21B7, '↷'), #          ↷-----          -----↷
-            (0X219C, '↜'), #          ↜-----          -----↜
-            (0X219D, '↝'), #          ↝-----          -----↝
-        ]
-}
 
 RESET = '\033[0m'
 
-# https://www.calculators.org/math/html-arrows.php so many arrows.....
-_arrows = "".join(chr(i) for i in range(0x2933, 0x2941 + 1))
-_arrows2 = "".join(chr(i) for i in range(0x2962, 0x2965+1)) + str(chr(0x2970))
-_arrows3 = "".join(chr(i) for i in range(0x2794, 0x27B2+1)) + str(chr(0x27BE)) # these symbols are cool in the right font
-_arrows4 = "⤏⤎⤍⤌⟿⟾⟽⟹⟶⟵"
-
-_symbols = [
-    "♣","♥","⚆","⚇","⚈","⚉","⚔","⚝",
-    "⚲","⚴","⛢","⚵","⚶","⚷","⚸","⚱","","","","","","","",
-    "⚺","⚻","",
-    "⚔","","","","","","","","","","","","","","","",
-    "⍎","⍏","⍕","⍖","⍗","⍙","⍚","⍜","⍢","⍦","⍱","⍲","⎈","⎉","⎊","⎋",
-    "⎌","⎍","⎏","⎐","⎑","⎒","⏀","⏁","⏂","⏃","⏄","⏅","⏚","","","",
-    
-    "⚙","⚛","☀","☼","☉","☸", # for proteins? idk
-    "⌖","⌘","⌗","⌾","⎮","","","","","",
-    "◐","◑","◒","◓","◸","◹","◺","◿","","","","","","","","",
-    "◐","◑","◒","◓","◸","◹","◺","◿","","","","","","","","",
-    
-]
-
-_curves = [
-    "⎡","⎢","⎣","","","","","","","","","","","","","",
-    
-    
-]
-
-_protein_metavocab = "".join(["☉","☼","⚙","⚛","❁","✾"])
-# _protein_metavocab = "".join(["◉","◎","◴","◵","◶","◷"])
-
-def get_arrow(name, stem_len, stem_char = '-'):
-    """"
-    returns L, R
-    """
-    left_d, right_d = arrows.get(name, arrows.get("default"))
-    left_h, right_h = left_d[1], right_d[1]
-    if stem_len < 1:
-        return left_h, right_h
-    left_f = left_h + stem_len * stem_char
-    right_f = stem_len * stem_char + right_h
-    
-    return left_f, right_f
-    
 color_names = ["black","red","green","yellow","blue","magenta","cyan","white"]
 color_ints = range(len(color_names))
 
@@ -226,15 +127,29 @@ class Colors:
         cols = [cols[i] for i in range(len(cols)) if i==0 or cols[i-1]!=cols[i]]
         return cols
 
+    def get_color_scale_24b(self, startrgb, endrgb, num_values):
+        
+        color_scale = []
+        
+        for n in range(num_values):
+            cn = []
+            for cs, ce in zip(startrgb, endrgb):
+                col = min(255, max(0, round(n * (ce - cs) / num_values + cs)))
+                cn.append(col)
+            color_scale.append(cn)
+        
+        return color_scale
+
     def get_color_scale(self, start, end, num_values):
         return self._get_color_scale(start, end, num_values, 6, self.colors[0], self.colors[-1])
 
-    def get_color_scale_16b(self, startrgb, endrgb, num_values):
-        d = 40 #?
-        mincol = (2**16 - d**3)//2
-        maxcol = 2**16 - mincol
-        return self._get_color_scale(startrgb, endrgb, num_values, d, mincol,maxcol)
-    
+    def get_double_color_scale(self, neg, neg_zero, pos_zero, pos, num_values):
+        
+        scneg = self._get_color_scale(neg, neg_zero, num_values, 6, self.colors[0], self.colors[-1])
+        scpos = self._get_color_scale(pos_zero, pos, num_values, 6, self.colors[0], self.colors[-1])
+        
+        return scneg + scpos
+
     def get_effect(self, effect_spec):
         if effect_spec == "bold":
             return "\x1b[1m"
@@ -306,13 +221,77 @@ def get_color_scheme(name):
         return 234, 65
     else:
         return 0,1
+
+def get_color_scheme_24b(name):
     
+    if name == "gray":
+        return [63,36,97], [255,92,131]
+    elif name == "coolwarm":
+        return [26,158,229], [250,144,50]
+    elif name == "sweet":
+        return [63,36,97], [255,92,131]
+    elif name == "lava":
+        return [28,55,57], [196,55,57] 
+    elif name == "energy":
+        return [36,71,122], [245,178,37]
+    elif name == "deep":
+        return [20,34,78], [180,34,78]
+    elif name == "terra":
+        return [19,118,83], [244,143,35]
+    elif name == "vscode":
+        return [28,28,28], [28,28,28]
+
+
 def get_fgbg(fg_color, bg_color):
     fg = f"\x1b[38;5;{fg_color}m"
     bg = f"\x1b[48;5;{bg_color}m"
     return fg, bg
 
+def show_colors():
+    
+    for i in range(256):
+        cstr = f"\x1b[38;5;{i}m"
+        print(cstr, i, SCALE, "this is a color!", SCALE[::-1], Colors.RESET)
+    print()
+    for i in range(256):
+        cstr = f"\x1b[48;5;{i}m"
+        print(cstr, i, SCALE, "this is a color!", SCALE[::-1], Colors.RESET)
+    
+def show_colors_24b(min, max, step):
+    
+    for i in range(min, max, step):
+        r = i % 256
+        g = (i//256) % 256
+        b = (i//(256*256)) % 256
+        
+        cstr = f"\x1b[38;2;{r};{g};{b}m"
+        print(cstr, i, SCALE, "this is a color!", SCALE[::-1], Colors.RESET)
+    print()
+    for i in range(min, max, step):
+        r = i % 256
+        g = (i//256) % 256
+        b = (i//(256*256)) % 256
+        
+        cstr = f"\x1b[48;2;{r};{g};{b}m"
+        print(cstr, f"[{r},{g},{b}]", SCALE, "this is a color!", SCALE[::-1], Colors.RESET)
+    
+    print(repr(cstr))
 
+def get_ansi_color(col, bg = False):
+    
+    if bg:
+        opt = 48
+    else:
+        opt = 38
+    
+    if isinstance(col, list):
+        r,g,b = col
+        code = f"\x1b[{opt};2;{r};{g};{b}m"
+    else:
+        code = f"\x1b[{opt};5;{col}m"
+    
+    return code
+    
 def scalar_to_text_8b(scalars, minval = None, maxval = None, fg_color = 53, bg_color = 234, flip = False):
     return scalar_to_text_nb(scalars, minval = minval, maxval = maxval, fg_color = fg_color, bg_color = bg_color, bit_depth = 8, flip = flip)
 
@@ -399,7 +378,7 @@ def scalar_to_text_nb(scalars, minval = None, maxval = None, fg_color = 53, bg_c
     if add_range:
         # hilo = "⎴⎵"
         # hilo = "⏋⏌"
-        ran_fstr = kwargs.get("range_fstr", "0.2f")
+        ran_fstr = kwargs.get("range_fstr", "<5.2f")
         hilo = "⌝⌟"
         hi, lo = list(hilo)
         hi, lo = (lo, hi) if flip else (hi, lo)
@@ -409,7 +388,7 @@ def scalar_to_text_nb(scalars, minval = None, maxval = None, fg_color = 53, bg_c
         if bit_depth > 8:
             outstrs[-1] += lo + minstr
             for i in range(1, len(outstrs) - 1):
-                outstrs[i] += " "*len(lo+minstr)
+                outstrs[i] += " "*max(len(hi+maxstr),len(lo+minstr))
         
     if flip:
         outstrs = flip_scalar_text(outstrs)
@@ -602,53 +581,6 @@ def scalar_plot_distribution(dist_dict, key_order = [], bit_depth = 8, labels = 
     
     return sctxt
 
-def scalar_plot_2d_distribution(dist_dict, key_order = [], min_color = 231, max_color = 76, num_colors = 9):
-    
-    if not key_order:
-        key_order = sorted(dist_dict.keys())
-    
-    chscale = [" ", OTHER.get("light"), OTHER.get("medium"), OTHER.get("dark"), SCALE[-1]]
-    
-    print(chscale)
-    print(OTHER)
-    
-    rst = "\x1b[0m"
-    colfrm = "\x1b[38;5;{col}m"
-    bgcol = '\x1b[48;5;232m'
-    
-    num_keys = len(key_order)
-    minval = min([min(a for a in d.values()) for d in dist_dict.values()])
-    maxval = max([max(a for a in d.values()) for d in dist_dict.values()])
-    ran = maxval - minval
-    
-    cscale = Colors().get_color_scale(min_color, max_color, num_colors)
-    num_colors = len(cscale)
-    return []
-    rows = []
-    for nx in range(num_keys):
-        kx = key_order[nx]
-        row = [bgcol]
-        for ny in range(num_keys):
-            ky = key_order[ny]
-            v = dist_dict[kx][ky]
-            
-            vqt = max(0, min(3*num_colors-1, int(3*num_colors*((v - minval) / ran))))
-            
-            charind = vqt // num_colors
-            colind = vqt % (len(cscale) - 1)
-            
-            char = chscale[charind]
-            c = cscale[colind]
-            
-            col = colfrm.format(col=c)
-            vstr = f"{col}{char}{char}{rst}"
-            row.append(vstr)
-            
-        row.append(rst)
-        rows.append("".join(row))
-    
-    return rows
-    
 def scrub_ansi(line):
     
     import re
@@ -682,64 +614,6 @@ def quantize(data, bit_depth, maxval=None, minval=None, mid = False):
     off = 0 if mid else 0.5
     return [int(bit_depth * (((d-c)/rng) + off)) for d in data]
 
-def scalar_to_text_nbh(scalars, minval = None, maxval = None, fg_color = 7, bg_color = 212, bit_depth = 24, flip = False, effect = None):
-    
-    len_sc = len(scalars)
-    
-    if flip:
-        fg = f"\x1b[48;5;{fg_color}m"
-        bg = f"\x1b[38;5;{bg_color}m"
-    else:
-        fg = f"\x1b[38;5;{fg_color}m"
-        bg = f"\x1b[48;5;{bg_color}m"
-    
-    eff = ""
-    if effect:
-        eff += str(effect)
-    
-    base_bit_depth = len(SCALE_H) - 1
-    if not bit_depth % base_bit_depth == 0:
-        return ["no"]
-    
-    ncols = bit_depth // base_bit_depth
-    nvals = base_bit_depth * ncols
-    
-    rows = [[fg+bg+eff] for r in range(len_sc)]
-    
-    bit_ranges = [base_bit_depth*i for i in range(ncols)]
-    
-    if not minval:
-        minval = min(scalars)
-    if not maxval:
-        maxval = max(scalars)
-    rng = (maxval - minval)/1
-    c = (minval+ maxval)/2
-    
-    for s, row in zip(scalars, rows):
-        sv = int(nvals*(s - c)/rng) + bit_depth // 2
-        for bit_range in bit_ranges:
-            if sv < bit_range:
-                sym = SCALE_H[0]
-            elif sv >= bit_range + base_bit_depth:
-                sym = SCALE_H[-1]
-            else:
-                ssv = sv % base_bit_depth
-                sym = SCALE_H[ssv]
-            row.append(sym)
-    
-    outstrs= []
-    for row in rows:
-        row.append(RESET)
-        border_row = ["▁" if r in SCALE else r for r in row]
-        outstrs.append("".join(row) + "\033[1G")
-        outstrs.append("".join(border_row))
-        print(outstrs[-1])
-        
-    if flip:
-        return hflip_scalar_text(outstrs)
-    else:
-        return outstrs
-
 def flip_scalar_text(sctext):
     
     nsyms = len(SCALE)
@@ -765,408 +639,288 @@ def clean_scalar_text(sctext):
         outrows.append("".join(newrow))
     return outrows
 
-def hflip_scalar_text(sctext):
+def show_history(genome, history, t, show_product = False):
     
-    nsyms = len(SCALE_H)
-    scale_inv = {SCALE_H[i]:SCALE_H[nsyms-i-1] for i in range(nsyms)}
+    hdrs = ["Gene"]
+    rows = [[gene_name] for gene_name in genome.gene_order]
     
-    out = []
-    for row in sctext[::-1]:
-        newrow = []
-        for sym in row:
-            newrow.append(scale_inv.get(sym, sym))
-        out.append("".join(newrow))
-    return out
-
-def highlight_subsequences(subseqs, colors, delimit = ""):
-    
-    if isinstance(colors[0], int):
-        colors = [f"\x1b[38;5;{c}m" for c in colors]
-    
-    lastcolor = colors[0]
-    out = [colors[0]]
-    for ss, c in zip(subseqs, colors):
-        if c == lastcolor:
-            pass
-        else:
-            out.append(RESET)
-            if delimit:
-                out.append(delimit)
-            out.append(c)
-            lastcolor = c
-        out.append(ss)
-    out.append(RESET)
-    return "".join(out)
-
-def make_start_ends(feature_name, feature_positions, feature_length, starts = {}, ends = {}):
-    
-    for p in feature_positions:
-        if not p in starts:
-            starts[p] = []
-        starts[p].append(feature_name)
+    for tt in range(t+1):
+        hdrs.append(f"Expr(t={tt})")
+        if show_product:
+            hdrs.extend([f"Prod(t={tt}, chr={n})" for n in range(genome.ploidy)])
         
-        end_pos = p + feature_length
-        if not end_pos in ends:
-            ends[end_pos] = []
-        ends[end_pos].append(feature_name)
+        expr = history["expression"][tt]
+        prod = history["product"][tt]
+        for ng in range(genome.num_genes):
+            rows[ng].append(expr[ng])
+            if show_product:
+                for nch in range(genome.ploidy):
+                    rows[ng].append(prod[nch][ng])
     
-    return starts, ends
-
-def make_key(features, colors):
+    print(tabulate(rows, headers = hdrs, floatfmt = "0.3f"))
+    print()
     
-    parts = ["key:"]
-    for f in features:
-        cf = colors.get(f)
-        cstr = f"\x1b[38;5;{cf}m"
-        fstr = "".join([cstr, f, RESET])
-        parts.append(fstr)
+def plot_expression(org, genes = False, phenes = True):
+    plot_expressions(org, genes=genes, phenes=phenes)
     
-    return " ".join(parts)
-
-# def highlight_matching(seqa, seqb, color = None, do_rc = False, do_both = False, suppress = False):
+def plot_interesting_genes(*orgs, topk = 5, headers = []):
     
-#     if do_both:
-#         do_rc = False
+    ngs = orgs[0].genome.num_genes - orgs[0].genome.num_phenes
+    scores = np.zeros((ngs,))
     
-#     if not color:
-#         color = Colors.HIGHLIGHT
-#         rcolor = Colors.MOTIF
-    
-#     seqah = []
-#     seqbh = []
-    
-#     rseqb = reversed(seqb)
-    
-#     n = 0
-#     for sa, sb, rsb in zip(seqa, seqb, rseqb):
+    for org in orgs:
+        ts = org.get_time_series()[:,:ngs].T
         
-#         rcsb = complement(rsb)
+        covs:np.ndarray = np.cov(ts)
+        exc_cov = covs / covs.diagonal()
         
-#         if sa == sb and not do_rc:
-#             pre = color
-#             post = Colors.RESET
-#         elif sa == rcsb and do_rc:
-#             pre = color
-#             post = Colors.RESET
-#         elif sa == rcsb and do_both:
-#             pre = rcolor
-#             post = Colors.RESET
-#         else:
-#             pre = ""
-#             post = ""
+        scores += covs.diagonal()/np.sum(np.abs(exc_cov), axis = 0)
+    
+    for ig in range(ngs):
+        print(orgs[0].genome.gene_order[ig],format(scores[ig], '0.5f'))
+    
+    best = sorted(enumerate(scores), key = lambda k:-k[1])[:topk]
+    
+    gene_names = [orgs[0].genome.gene_order[i] for i,_ in best]
+    
+    plot_expressions(*orgs, genes = True, phenes = False, headers = headers, gene_names = gene_names)
+    
+
+def plot_expressions(*orgs, genes = False, phenes = True, gene_names = []):
+    
+    rowfmt = "{:<16}{}"
+    delimit = "     "
+    cols = [53, 136]
+    
+    names = []
+    all_rows = []
+    for ng, gi in enumerate(orgs[0].genome):
         
-#         seqah.append(f"{pre}{sa}{post}")
-#         seqbh.append(f"{pre}{sb}{post}")
-#         n+=1
+        if not genes and gi.is_genotype:
+            continue
+        elif gene_names and not gi.name in gene_names:
+            continue
+        elif not phenes and gi.is_phenotype:
+            continue
         
-#     if not suppress:
-#         print("".join(seqah))
-#         print("".join(seqbh))
-#     return "".join(seqah), "".join(seqbh)
-
-# def highlight_correlated(full_seq, shift, colors = None, suppress = False):
-    
-#     if not colors:
-#         ca = Colors.RCMOTIF
-#         cab= Colors.HIGHLIGHT
-#         cb = Colors.MOTIF
-    
-#     seq_len = len(full_seq)
-    
-#     seqah = []
-#     seqbh = []
-    
-#     sas = min(0, shift)
-#     sbs = max(0, -shift)
-    
-#     for n in range(len(full_seq)):
-        
-#         sf = full_seq[n]
-#         sa = sb = ""
-        
-#         if sas + n < seq_len:
-#             sa = full_seq[sas + n]        
-#         if sbs + n < seq_len:
-#             sb = full_seq[sbs + n]
-        
-#         if sa == sb:
-#             pre = ca
-#             post = Colors.RESET
-#         else:
-#             pre = ""
-#             post = ""
-        
-#         if sa and sb:
-#             seqah.append(f"{cab}{sf}{post}")
-#         elif sa:
-#             seqah.append(f"{ca}{sf}{post}")
-#         elif sb:
-#             seqah.append(f"{cb}{sf}{post}")
-        
-#     if not suppress:
-#         print("".join(seqah))
-#         print("".join(seqbh))
-#     return "".join(seqah+seqbh)
-
-# def highlight_features(seq, features, feature_starts, feature_ends, colors = {}, show_key = True, suppress = True):
-#     """
-#     feature_starts: Dict:feature -> List[feature_start_pos]
-#     feature_ends: Dict:feature -> List[feature_end_pos]
-#     """
-#     # Build the colored string
-    
-#     baseline_color = 240
-#     bc = f"\x1b[38;5;{baseline_color}m"
-    
-#     result = []
-#     active_seqs = []  # Currently active sequences
-#     current_color = 0
-#     last_ansi = bc
-    
-#     for s in features:
-#         if not s in colors:
-#             colors[s] = random.randint(20, 230)
-    
-#     key = make_key(features, colors)
-    
-#     result.append(bc)  # Start with baseline color
-
-#     for i in range(len(seq)):
-#         if i in feature_ends:
-#             for s in feature_ends[i]:
-#                 if s in active_seqs:
-#                     active_seqs.remove(s)
-
-#         if i in feature_starts:
-#             for s in feature_starts[i]:
-#                 if s not in active_seqs:
-#                     active_seqs.append(s)
-
-#         if not active_seqs:
-#             current_color = baseline_color
-#         elif len(active_seqs) == 1:
-#             current_color = colors[active_seqs[0]]
-#         elif len(active_seqs) == 2:
-#             color_sum = sum(colors[s] for s in active_seqs)
-#             current_color = 20 + (color_sum % 211)
-#         else:
-#             current_color = 255
-
-#         ansi = f"\x1b[38;5;{current_color}m"
-
-#         if ansi != last_ansi:
-#             result.append(ansi)
-#             last_ansi = ansi
-
-#         result.append(seq[i])
-
-#     result.append(RESET)
-#     if not suppress:
-#         print("".join(result))
-#         if show_key:
-#             print(key)
-#     return result, key
-
-# def highlight_sequence(seq, subseq, colors = {}, suppress = True):
-    
-#     starts = {}  # position -> list of sequences starting there
-#     ends = {}    # position -> list of sequences ending there
-    
-#     if not subseq in colors:
-#         colors[subseq] = random.randint(20, 230)
-
-#     start_pos = find_subsequence(seq, subseq)
-#     starts, ends = make_start_ends(subseq, start_pos, len(subseq), starts=starts, ends = ends)
-
-#     return highlight_features(seq, [subseq], starts, ends, suppress = suppress)
-
-# def highlight_sequences(seq:str, subseqs:List[str], start_pos = None, do_rc = False, min_len = 5, colors={}, show_key = True, suppress = True):
-
-#     starts = {}  # position -> list of sequences starting there
-#     ends = {}    # position -> list of sequences ending there
-    
-#     for s in subseqs:
-#         if not s in colors:
-#             colors[s] = random.randint(20, 230)
-    
-#     if not start_pos:
-#         start_pos = find_subsequences(seq, subseqs, do_rc = do_rc)
-#     for s in subseqs:
-#         if len(s) < min_len:
-#             continue
-
-#         starts, ends = make_start_ends(s, start_pos[s], len(s), starts=starts, ends = ends)
-
-#     highlight_features(seq, subseqs, starts, ends, colors = colors, show_key = show_key, suppress = suppress)
-
-    
-# def highlight_sequences_in_frame(seq:str, subseqs:List[str], frame_start, min_len = 5):
-    
-#     starts = {}  # position -> list of sequences starting there
-#     ends = {}    # position -> list of sequences ending there
-
-#     # Baseline color - a visible gray (color 240 is a nice medium gray)
-#     baseline_color = 240
-#     bc = f"\x1b[38;5;{baseline_color}m"
-    
-#     colors = {}
-#     for s in subseqs:
-#         colors[s] = random.randint(20, 230)
-
-#     # Find all occurrences of each subsequence
-#     for s in subseqs:
-#         if len(s) < min_len:
-#             continue
-        
-#         seq_pos = find_subsequence(seq, s, frame_start = frame_start)
-#         for p in seq_pos:
-#             if not p in starts:
-#                 starts[p] = []
-#             starts[p].append(s)
-        
-#             end_pos = p + len(s)
-#             if not end_pos in ends:
-#                 ends[end_pos] = []
-#             ends[end_pos].append(s)
-
-#     # Build the colored string
-#     result = []
-#     active_seqs = []  # Currently active sequences
-#     current_color = 0
-#     last_ansi = bc
-
-#     result.append(bc)  # Start with baseline color
-
-#     for i in range(len(seq)):
-#         if i in ends:
-#             for s in ends[i]:
-#                 if s in active_seqs:
-#                     active_seqs.remove(s)
-
-#         if i in starts:
-#             for s in starts[i]:
-#                 if s not in active_seqs:
-#                     active_seqs.append(s)
-
-#         if not active_seqs:
-#             current_color = baseline_color
-#         elif len(active_seqs) == 1:
-#             current_color = colors[active_seqs[0]]
-#         elif len(active_seqs) == 2:
-#             color_sum = sum(colors[s] for s in active_seqs)
-#             current_color = 20 + (color_sum % 211)
-#         else:
-#             current_color = 255
-
-#         ansi = f"\x1b[38;5;{current_color}m"
-
-#         if ansi != last_ansi:
-#             result.append(ansi)
-#             last_ansi = ansi
-
-#         result.append(seq[i])
-
-#     result.append(RESET)
-
-#     print("".join(result))
-
-# def highlight_sequence_by_span(seq, span_colors = {}, default_color = '\033[97m'):
-#     # span is (start, stop):color
-    
-#     spans = sorted(span_colors.keys(), key=lambda k:k[0])
-#     ccurr = default_color
-#     colored_seq = []
-#     for i, b in enumerate(seq):
-        
-#         in_span = False
-#         for st, sp in spans:
-#             c = span_colors[(st, sp)]
-#             if i>sp:
-#                 continue
-#             elif i<st:
-#                 break
+        rows = [[],[],[]]
+        for org in orgs:
             
-#             if i>=st and i<sp:
-#                 in_span = True
-#                 new_c = c
-#                 if new_c == ccurr:
-#                     continue
-#                 else:
-#                     colored_seq.append(new_c)
-#                     ccurr = new_c
-        
-#         if not in_span:
-#             colored_seq.append(default_color)
-        
-#         colored_seq.append(b)
-#     colored_seq.append(RESET)
-#     return "".join(colored_seq)
-
-# def highlight_dyads(seq, dyads):
-    
-#     sec = {(d.stem_start, d.end_position): random.randint(20, 230) for d in sorted(dyads, key = lambda d:d.stem_start)}
-    
-#     outseq = []
-    
-#     for i in range(len(seq)):
-        
-#         pre = ""
-#         post = ""
-#         for st, en in sec:
-#             if i < st:
-#                 break
-#             if i > en:
-#                 continue
-#             c = sec[(st, en)]
-#             pre = f"\x1b[38;5;{c}m"
-#             post = Colors.RESET
+            gene_data = []
+            for tt in range(org.t):
+                expr = org.history["expression"][tt][ng]
+                gene_data.append(expr)
             
-#         outseq.append(f"{pre}{seq[i]}{post}")
-    
-#     return "".join(outseq)
-    
-# def draw_gene_structure(gene_features, gene_name, strand):
-#     """Draw a simple gene structure cartoon"""
-#     fig, ax = plt.subplots(figsize=(12, 3))
-    
-#     # Sort features by position
-#     features = sorted(gene_features, key=lambda x: x['start'])
-    
-#     # Gene baseline
-#     gene_start = features[0]['start']
-#     gene_end = features[-1]['end']
-#     ax.plot([gene_start, gene_end], [0.5, 0.5], 'k-', linewidth=1)
-    
-#     # Draw features
-#     for feat in features:
-#         if feat['type'] == 'exon':
-#             # Determine if CDS or UTR
-#             height = 0.3 if 'CDS' in feat.get('extra_types', []) else 0.15
-#             color = 'darkblue' if 'CDS' in feat.get('extra_types', []) else 'lightblue'
+            col = cols[1] if gi.is_phenotype else cols[0]
+            maxval = None if gi.is_phenotype else 1
             
-#             rect = patches.Rectangle(
-#                 (feat['start'], 0.5 - height/2), 
-#                 feat['end'] - feat['start'], 
-#                 height,
-#                 facecolor=color,
-#                 edgecolor='black'
-#             )
-#             ax.add_patch(rect)
+            sctxt = scalar_to_text_nb(gene_data, minval = 0, maxval = maxval, add_range = True, fg_color = col)
+            for i in range(len(sctxt)):
+                rows[i].append(sctxt[i])
+        names.append(gi._base_name)
+        all_rows.append(rows)
+        
+    headers = [f"Genome{org.genome.tag} ({i})" for i, org in enumerate(orgs)]
+    fig_len = orgs[0].t + 5 + len(delimit)
+    print(rowfmt.format("", "".join([format(hdr, f"<{fig_len}") for hdr in headers])))
     
-#     # Add arrow for strand
-#     arrow_y = 0.5
-#     if strand == '+':
-#         ax.arrow(gene_end, arrow_y, 1000, 0, head_width=0.05, head_length=500, fc='red')
-#     else:
-#         ax.arrow(gene_start, arrow_y, -1000, 0, head_width=0.05, head_length=500, fc='red')
-    
-#     # Formatting
-#     ax.set_ylim(0, 1)
-#     ax.set_xlim(gene_start - 5000, gene_end + 5000)
-#     ax.set_title(f"{gene_name} ({strand} strand)")
-#     ax.set_xlabel("Genomic Position")
-#     ax.get_yaxis().set_visible(False)
-    
-#     plt.tight_layout()
-#     return fig
+    for ng in range(len(all_rows)):
+        rows = all_rows[ng]
+        lbls = [names[ng], "", ""]
+        for lbl,row in zip(lbls,rows):
+            print(rowfmt.format(lbl, "    ".join(row)))
+        print()
+        
 
+def plot_product(genome, history, t):
+    
+    rowfmt = "{:<8}{}"
+    
+    for ng in range(genome.num_genes):
+        gene_name = genome.gene_order[ng]
+        for nchr in range(genome.ploidy):
+            gene_data = []
+            for tt in range(t+1):
+                prod = history["product"][tt][nchr][ng]
+                gene_data.append(prod)
+
+            sctxt = scalar_to_text_nb(gene_data, minval = 0, add_range = True)
+            lbls = [genome.genotype[nchr][gene_name].id, "", ""]
+            for r, lbl in zip(sctxt, lbls):
+                print(rowfmt.format(lbl, r))
+            print()
+
+def plot_states(genome, history):
+    
+    rowfmt = "{:<8}{}"
+    
+    for t in range(t):
+        
+        state_data = []
+        for ng in range(genome.num_genes):
+            gexpr = history["expression"][t][ng]
+            state_data.append(gexpr)
+            
+        sctxt = scalar_to_text_nb(state_data, minval = 0, add_range = True)
+        lbls = [f"t={t}", "", ""]
+            
+        for r, lbl in zip(sctxt, lbls):
+            print(rowfmt.format(lbl, r))
+        print()
+
+def show_genome(genome):
+    
+    hdrs = ["Gene", "Expression", "Regulation", "# Downstream", "# Upstream", "Product", "Scale", "Threshold", "Decay"]
+    rows = []
+    
+    num_upstream = genome.count_upstream()
+    num_downstream = genome.count_downstream()
+    
+    rows = []
+    for gi in range(genome.num_genes):
+        gene_name = genome.gene_order[gi]
+        g = genome.genes[gene_name]
+
+        row = [g.name, format(genome.expression.get(g.name, 0.0), "0.3f"), format(g.regulation, "0.3f")]
+        row.extend([num_downstream[gi], num_upstream[gi]])
+        row.extend(["--" for i in range(4)])
+        rows.append(row)
+        
+        for nch in range(genome.ploidy):
+            a = genome.genotype[nch].get(g.name)
+            row = [a.id, "--", "--", "--", "--", format(a.product,"0.3f"), format(a.scale,"0.3f"), format(a.threshold,"0.3f"), format(a.decay,"0.3f")]
+            rows.append(row)
+    
+    print(tabulate(rows, headers = hdrs, floatfmt = "0.3f"))
+    print()
+
+def show_interactions(genome):
+
+    tab = []
+    headers = [gj.name for gj in genome.iter_genes()]
+
+    for i, gi in enumerate(genome):
+        row = [gi.name]
+        gi_inters = genome.interactions.get(gi.name, {})
+        for j, gj in enumerate(genome.iter_genes()):
+            inter = gi_inters.get(gj.name)
+            if not inter:
+                inter_wgt = 0.0
+            else:
+                inter_wgt = inter.weight if hasattr(inter, "weight") else f"{inter}(!)"
+            row.append(inter_wgt)
+        tab.append(row)
+
+    print("Interactions (cols are effectors)")
+    print(tabulate(tab, headers = headers, floatfmt = "0.3f"))
+
+def show_interaction_heatmap(inter_arr, col_labels = [], **kwargs):
+    heatmap(inter_arr, col_labels = col_labels, **kwargs)
+
+
+def heatmap(data, row_labels=None, col_labels=None, minval=None, maxval=None,
+            center=0, color_scheme = "terra",
+            show_values=False, value_fmt="0.2f", colorbar=True):
+
+    if isinstance(data, np.ndarray):
+        data = data.tolist()
+
+    min_color, max_color = get_color_scheme_24b(color_scheme)
+    mid_color, _ = get_color_scheme_24b("vscode")
+    
+    nrows = len(data)
+    ncols = len(data[0]) if nrows > 0 else 0
+
+    if nrows == 0 or ncols == 0:
+        print("Empty data")
+        return
+
+    flat_data = [val for row in data for val in row]
+
+    if minval is None:
+        minval = min(flat_data)
+    if maxval is None:
+        maxval = max(flat_data)
+        
+    rng = maxval - minval
+    if rng == 0:
+        rng = 1
+    
+    colors = Colors()
+
+    if center is not None:
+        sym_range = max(abs(maxval - center), abs(minval - center))
+        minval = center - sym_range
+        maxval = center + sym_range
+
+        num_colors = 20
+        cs1 = colors.get_color_scale_24b(mid_color, min_color, num_colors//2)
+        cs2 = colors.get_color_scale_24b(mid_color, max_color, num_colors//2)
+        color_scale = cs1[::-1] + cs2
+    else:
+        if min_color is None:
+            min_color = 16
+        if max_color is None:
+            max_color = 226
+
+        num_colors = 20
+        color_scale = colors.get_color_scale(min_color, max_color, num_colors)
+
+    def value_to_color(val):
+        normalized = (val - minval) / rng
+        color_idx = int(normalized * (len(color_scale) - 1))
+        color_idx = max(0, min(len(color_scale) - 1, color_idx))
+        return color_scale[color_idx]
+
+    if row_labels is None:
+        row_labels = []
+    if col_labels is None:
+        col_labels = []
+        
+    max_row_label_len = max(len(str(lbl)) for lbl in row_labels) if row_labels else 0
+
+    if col_labels:
+        header_line = " " * (max_row_label_len + 2)
+        for col_lbl in col_labels:
+            short_lbl = str(col_lbl)[:2].center(2)
+            header_line += short_lbl
+        print(header_line)
+
+    block = SCALE[-1]
+
+    for i, row in enumerate(data):
+        row_lbl = str(row_labels[i]).ljust(max_row_label_len) if row_labels else ""
+        line = row_lbl + "  "
+
+        for val in row:
+            color_code = value_to_color(val)
+            fg = get_ansi_color(color_code)
+        
+            if show_values:
+                val_str = format(val, value_fmt)
+                fg = get_ansi_color(232) if color_code > 128 else get_ansi_color(20)
+                line += fg + fg + val_str[:2].center(2) + RESET
+            else:
+                line += fg + block * 2 + RESET
+
+        print(line)
+
+    if colorbar:
+        print()
+        colorbar_len = 40
+        colorbar_line = " " * (max_row_label_len + 2)
+
+        for i in range(colorbar_len):
+            normalized = i / (colorbar_len - 1)
+            val = minval + normalized * rng
+            color_code = value_to_color(val)
+            fg = get_ansi_color(color_code)
+            colorbar_line += fg + SCALE[-1] + RESET
+
+        print(colorbar_line)
+
+        # Colorbar labels
+        label_line = " " * (max_row_label_len + 2)
+        label_line += format(minval, value_fmt).ljust(colorbar_len // 2)
+        label_line += format(maxval, value_fmt).rjust(colorbar_len // 2)
+        print(label_line)

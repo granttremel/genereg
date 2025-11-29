@@ -14,15 +14,11 @@ from genereg import utils, organism
 from genereg.organism import Organism, Population
 
 
-def try_generation(pop_size, num_genes, num_phenotypes, density, num_timesteps, **kwargs):
+def try_generation(gnm, pop_size, num_timesteps, mutation_rate, mutation_p, **kwargs):
     
+    mean_offs = kwargs.pop("mean_offs", 4)
+    epoch = kwargs.pop("epoch", 20)
     
-    mean_init_product = kwargs.get("mean_init_product", 0.1)
-    sd_init_product = kwargs.get("sd_init_product", 0.0)
-    
-    epoch = kwargs.get("epoch", 20)
-    
-    gnm = Genome.initialize_random(num_genes, num_phenotypes, density, **kwargs)
     pop = Population(gnm)
     
     for n in range(pop_size):
@@ -31,34 +27,13 @@ def try_generation(pop_size, num_genes, num_phenotypes, density, num_timesteps, 
     
     pop.individuals[0].show_genome()
     
-    # input()
-    
-    gen = 0
     while True:
-        pop.initialize(mean_init_product=mean_init_product, sd_init_product=sd_init_product)
-        pop.step_to(num_timesteps)
+        pop.step_epoch(epoch, mutation_rate, mutation_p,  mean_offs = mean_offs, num_timesteps = num_timesteps, **kwargs)
+        pop.show_top(8)
+        input()
         
-        mean_offs = kwargs.get("mean_offs", 4)
-        n_parents = pop_size // mean_offs
-        
-        topk_orgs, topk_uniqs = pop.quantify(topk = n_parents)
-        
-        new_offs = pop.step_generation(topk_orgs, mean_offs, mutation_rate = 0.3, mutation_p = 0.3)
-        gen += 1
-        
-        print(f"completed gen {gen}, with pop size {len(pop.individuals)} mean uniqueness {np.mean(topk_uniqs):0.3f}")
-        
-        if gen % epoch == 0:
-            topk_orgs[0].show_genome()
-            Organism.plot_expressions(*topk_orgs[:8])
-            res = input("keep going?\n")
-            if 'n' in res.lower():
-                break
+    return pop
     
-    print("most unique organism (gen 1)")
-    topk_orgs[0].show_genome()
-    # topk_orgs[0].plot_expression()
-    Organism.plot_expressions(*topk_orgs)
 
 
 def main():
