@@ -1,9 +1,12 @@
 
+from abc import abstractmethod, ABC
+
 from typing import Dict, List, Tuple, Any, Union, Optional
 import numpy as np
 import random
 
 from genereg.utils import Rectifier, CostFunction, Epistasis
+
 
 class Gene:
     """
@@ -53,10 +56,6 @@ class Gene:
         return self.rect(gene_product)
     
     def evaluate(self, *allele_products):
-        if None in allele_products:
-            print(self.name, [a.id for a in self.alleles.values()])
-            print([a.get_state() for a in self.alleles.values()])
-            return 0
         gene_product = self.epistasis(*allele_products)
         self.gene_product = self.rectify(gene_product)
         return self.gene_product
@@ -137,8 +136,9 @@ class Allele:
         self.scale = np.clip(scale, 0.0, None)
         self.threshold = threshold
         self.decay = np.clip(decay, 0.0, 1.0)
-        self.n = kwargs.get("n", 2.0)
-        self.kn = kwargs.get("kn", 0.5)
+        
+        # self.n = kwargs.get("n", 2.0)
+        # self.kn = kwargs.get("kn", 0.5)
         self.product = kwargs.get("init_product")
         
         self.silenced = False
@@ -164,8 +164,9 @@ class Allele:
         """
         conversion of gene expression quantity into measure of EFFECT of gene product. expression is added to baseline expression, i.e. mRNAs per time, then scaled to quantity of gene product (e.g. concentration of protein). Gene products degrade at a rate determined by decay, and residual is added. This is rectified in gene-dependent manner to maintain biological realism (some gene products cannot be negative, some have saturating behavior). 
         """
-        rn = abs(np.pow(regulation, self.n))
-        theta = rn / (self.kn + rn)
+        # rn = abs(np.pow(regulation, self.n))
+        # theta = rn / (self.kn + rn)
+        theta = 1.0
         product = theta * self.scale * (regulation-self.threshold) + self.decay * self.product
         self.product = product
         return product
@@ -233,54 +234,61 @@ class Allele:
         a.set_state(state_dict)
         return a
 
-class Interaction:
-    
-    def __init__(self, effector_gene, affected_gene, **kwargs):
-        
-        if effector_gene.is_phenotype:
-            raise ValueError
-        
-        self.effector:Gene = effector_gene
-        self.affected:Gene = affected_gene
-        self.weight = kwargs.get("weight", 0.0)
-        
-    def evaluate(self):
-        return self.weight * self.effector.gene_product
-    
-    def copy(self):
-        return Interaction.from_state(self.get_state(), self.effector, self.affected)
-    
-    def get_state(self):
-        return {
-            "effector_name":self.effector.name,
-            "affected_name":self.affected.name,
-            "weight":self.weight,
-        }
-    
-    def set_state(self, state_dict, effector_gene = None, affected_gene = None):
-        
-        if effector_gene:
-            self.effector = effector_gene
-        if affected_gene:
-            self.affected = affected_gene
-        
-        for k, v in state_dict.items():
-            if hasattr(self, k):
-                setattr(self, k, v)
-    
-    def mutate(self, rate = 0.1, p = 0.2):
-        
-        weight = self.weight
-        if random.random() < p:
-            weight += random.normalvariate(0, rate*max(abs(self.weight), 0.01))
-    
-        return Interaction(self.effector, self.affected, weight = weight)
-    
     @classmethod
-    def from_state(cls, state_dict, effector_gene, affected_gene):
-        inter = cls(effector_gene, affected_gene)
-        inter.set_state(state_dict)
-        return inter
+    def generate_interaction_vector(cls, mean, sd, dim, dist = "normal", normalize=True):
+        
+        
+        
+        pass
+
+# class Interaction:
+    
+#     def __init__(self, effector_gene, affected_gene, **kwargs):
+        
+#         if effector_gene.is_phenotype:
+#             raise ValueError
+        
+#         self.effector:Gene = effector_gene
+#         self.affected:Gene = affected_gene
+#         self.weight = kwargs.get("weight", 0.0)
+        
+#     def evaluate(self):
+#         return self.weight * self.effector.gene_product
+    
+#     def copy(self):
+#         return Interaction.from_state(self.get_state(), self.effector, self.affected)
+    
+#     def get_state(self):
+#         return {
+#             "effector_name":self.effector.name,
+#             "affected_name":self.affected.name,
+#             "weight":self.weight,
+#         }
+    
+#     def set_state(self, state_dict, effector_gene = None, affected_gene = None):
+        
+#         if effector_gene:
+#             self.effector = effector_gene
+#         if affected_gene:
+#             self.affected = affected_gene
+        
+#         for k, v in state_dict.items():
+#             if hasattr(self, k):
+#                 setattr(self, k, v)
+    
+#     def mutate(self, rate = 0.1, p = 0.2):
+        
+#         weight = self.weight
+#         if random.random() < p:
+#             weight += random.normalvariate(0, rate*max(abs(self.weight), 0.01))
+    
+#         return Interaction(self.effector, self.affected, weight = weight)
+    
+#     @classmethod
+#     def from_state(cls, state_dict, effector_gene, affected_gene):
+#         inter = cls(effector_gene, affected_gene)
+#         inter.set_state(state_dict)
+#         return inter
     
 class Phene(Gene):
     """
